@@ -34,6 +34,9 @@ const config = {
   sendJitterMinMs: num(process.env.SEND_JITTER_MIN_MS, 4000),
   sendJitterMaxMs: num(process.env.SEND_JITTER_MAX_MS, 18000),
   maxSendAttempts: num(process.env.MAX_SEND_ATTEMPTS, 3),
+  // Max posts that may be scheduled to run on any single calendar day (UTC),
+  // per account. Keeps automated volume low to reduce WhatsApp ban risk.
+  maxScheduledPerDay: num(process.env.MAX_SCHEDULED_PER_DAY, 3),
 };
 
 module.exports = config;

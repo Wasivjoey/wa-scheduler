@@ -149,7 +149,28 @@ function listGroups(accountId) {
 }
 
 /**
- * Send one message (text and/or media) to a single group jid.
+ * Resolve a phone number to its WhatsApp private-chat jid, confirming the
+ * number is actually on WhatsApp. Returns { jid, exists }. Used to let the
+ * user schedule posts to a private chat (a contact), not just a group.
+ */
+async function resolveContact(accountId, rawNumber) {
+  const conn = connections.get(accountId);
+  if (!conn || !conn.sock || conn.status !== 'connected') {
+    throw new Error('WhatsApp account is not connected');
+  }
+  const digits = String(rawNumber || '').replace(/[^0-9]/g, '');
+  if (digits.length < 6) throw new Error('Enter a full phone number with country code');
+  const results = await conn.sock.onWhatsApp(digits);
+  const hit = Array.isArray(results) ? results[0] : null;
+  if (!hit || !hit.exists || !hit.jid) {
+    throw new Error('That number is not on WhatsApp');
+  }
+  return { jid: hit.jid, exists: true };
+}
+
+/**
+ * Send one message (text and/or media) to a single jid. The jid may be a
+ * group (…@g.us) or a private chat (…@s.whatsapp.net) — Baileys handles both.
  * Throws on failure so the caller can record the error + retry.
  */
 async function sendToGroup(accountId, groupJid, { body, mediaPath, mediaType }) {
@@ -203,6 +224,7 @@ module.exports = {
   startConnection,
   refreshGroups,
   listGroups,
+  resolveContact,
   sendToGroup,
   logout,
   statusOf,

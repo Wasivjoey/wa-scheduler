@@ -136,15 +136,52 @@ async function loadGroups() {
       ${escapeHtml(g.name)}</label>`).join('');
 }
 
+// ---------- Private chats (contacts) ----------
+// Targets added by phone number. Same shape as group targets ({jid, name}).
+let contacts = [];
+const DAILY_HINT = 'Up to 3 posts can be scheduled per day.';
+
+function renderContacts() {
+  const el = $('contactList');
+  el.innerHTML = contacts.map((c, i) =>
+    `<span class="chip">${escapeHtml(c.name)} <button type="button" class="chip-x" data-rm="${i}" aria-label="Remove">×</button></span>`
+  ).join('');
+  el.querySelectorAll('[data-rm]').forEach((b) =>
+    (b.onclick = () => { contacts.splice(Number(b.dataset.rm), 1); renderContacts(); }));
+}
+
+async function addContact() {
+  const err = $('composeErr'); err.hidden = true;
+  const input = $('contactNumber');
+  const number = input.value.trim();
+  if (!number) return;
+  const btn = $('addContactBtn'); btn.disabled = true; btn.textContent = 'Checking…';
+  try {
+    const { jid } = await api(`/api/accounts/${currentAccountId}/resolve-contact`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ number }),
+    });
+    if (!contacts.some((c) => c.jid === jid)) contacts.push({ jid, name: number });
+    input.value = '';
+    renderContacts();
+  } catch (ex) {
+    showErr(err, ex.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Add';
+  }
+}
+
 // ---------- Compose ----------
 $('composeForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const err = $('composeErr'); err.hidden = true;
-  const checked = [...document.querySelectorAll('#groupList input:checked')]
+  const groupTargets = [...document.querySelectorAll('#groupList input:checked')]
     .map((c) => ({ jid: c.value, name: c.dataset.name }));
+  const targets = [...groupTargets, ...contacts];
   const runAtLocal = $('runAt').value;
   if (!runAtLocal) { showErr(err, 'Pick a send time.'); return; }
-  if (checked.length === 0) { showErr(err, 'Pick at least one group.'); return; }
+  if (targets.length === 0) { showErr(err, 'Pick at least one group or add a phone number.'); return; }
 
   const fd = new FormData();
   fd.append('account_id', currentAccountId);
@@ -152,16 +189,17 @@ $('composeForm').addEventListener('submit', async (e) => {
   // datetime-local is local time; convert to ISO (UTC) for the server.
   fd.append('run_at', new Date(runAtLocal).toISOString());
   fd.append('repeat', $('repeat').value);
-  fd.append('targets', JSON.stringify(checked));
+  fd.append('targets', JSON.stringify(targets));
   if ($('media').files[0]) fd.append('media', $('media').files[0]);
 
   const btn = $('scheduleBtn'); btn.disabled = true; btn.textContent = 'Scheduling…';
   try {
     await api('/api/posts', { method: 'POST', body: fd });
     $('composeForm').reset();
+    contacts = []; renderContacts();
     await loadPosts();
     $('composeHint').textContent = 'Scheduled ✓';
-    setTimeout(() => ($('composeHint').textContent = ''), 2500);
+    setTimeout(() => ($('composeHint').textContent = DAILY_HINT), 2500);
   } catch (ex) {
     showErr(err, ex.message);
   } finally {
@@ -235,9 +273,11 @@ async function refreshAll() {
 $('accountSelect').addEventListener('change', (e) => {
   currentAccountId = Number(e.target.value);
   clearTimeout(statusTimer);
+  contacts = []; renderContacts();
   refreshAll();
 });
 $('newAccountBtn').onclick = () => createAccount();
+$('addContactBtn').onclick = addContact;
 $('refreshPostsBtn').onclick = loadPosts;
 $('logoutBtn').onclick = async () => { await api('/api/logout', { method: 'POST' }); location.href = '/login'; };
 

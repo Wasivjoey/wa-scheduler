@@ -58,8 +58,15 @@
             <label>Groups
               <div class="group-list" id="groupList"><p class="muted">Connect WhatsApp to load groups.</p></div>
             </label>
+            <label>Or a private chat (phone number)
+              <div class="row">
+                <input type="tel" id="contactNumber" placeholder="+1 555 123 4567" style="flex:1" />
+                <button type="button" class="ghost small" id="addContactBtn">Add</button>
+              </div>
+            </label>
+            <div class="chips" id="contactList"></div>
             <div class="row spread">
-              <span class="muted" id="composeHint"></span>
+              <span class="muted" id="composeHint">Up to 3 posts can be scheduled per day.</span>
               <button type="submit" id="scheduleBtn">Schedule</button>
             </div>
             <p class="error" id="composeErr" hidden></p>

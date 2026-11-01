@@ -75,6 +75,19 @@ router.post('/', upload.single('media'), (req, res) => {
     return res.status(400).json({ error: 'post needs text or a media attachment' });
   }
 
+  // Enforce the per-day scheduling cap (per account), counting posts that are
+  // set to run on the same UTC calendar day and are still live or already sent.
+  const dayRow = db.prepare(`
+    SELECT COUNT(*) AS n FROM posts
+    WHERE account_id = ? AND date(run_at) = date(?)
+      AND status IN ('scheduled', 'sending', 'sent')
+  `).get(accountId, runAt.toISOString());
+  if (dayRow.n >= config.maxScheduledPerDay) {
+    return res.status(400).json({
+      error: `Daily limit reached: at most ${config.maxScheduledPerDay} posts can be scheduled for ${runAt.toISOString().slice(0, 10)}.`,
+    });
+  }
+
   const mediaPath = req.file ? req.file.path : null;
   const mediaType = req.file ? mediaTypeFor(req.file.mimetype) : null;
 

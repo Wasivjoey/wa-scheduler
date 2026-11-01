@@ -42,6 +42,18 @@ router.get('/:id/groups', async (req, res) => {
   res.json(wa.listGroups(id));
 });
 
+// Resolve a phone number to a private-chat target (confirms it's on WhatsApp).
+router.post('/:id/resolve-contact', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!wa.isConnected(id)) return res.status(400).json({ error: 'WhatsApp not connected' });
+  try {
+    const { jid } = await wa.resolveContact(id, req.body.number);
+    res.json({ jid });
+  } catch (e) {
+    res.status(400).json({ error: String(e.message || e) });
+  }
+});
+
 // Unlink / log out of WhatsApp (keeps the account record).
 router.post('/:id/logout', async (req, res) => {
   await wa.logout(Number(req.params.id));
